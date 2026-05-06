@@ -5,34 +5,69 @@
 #include "duckdb/common/vector/struct_vector.hpp"
 #include "duckdb/common/vector_operations/binary_executor.hpp"
 
+#include <cstdlib>
+
 namespace duckdb {
 
 namespace {
 
+// ---------------------------------------------------------------------------
 // Format the difference between `target` and `reference` as a human-readable
-// English phrase such as "5 minutes ago".
+// English phrase such as "5 minutes ago" or "in 3 hours".
 //
-// Initial implementation: handles the three smallest units (seconds, minutes,
-// hours) for past-direction inputs only. Larger units, future direction,
-// singular forms, and the just-below-one-second case have not been tackled
-// yet and are tracked separately.
+// Initial implementation: covers the three smallest units (seconds, minutes,
+// hours) only. Phrasing handles past / future / negligible-delta direction
+// and singular / plural forms. Larger units (days, weeks, months, years)
+// and additional input-type overloads (DATE, TIMESTAMP_TZ) have not been
+// tackled yet.
+// ---------------------------------------------------------------------------
+
+const char *UnitNameLong(int unit, bool plural) {
+	// unit: 0=second, 1=minute, 2=hour
+	switch (unit) {
+	case 0:
+		return plural ? "seconds" : "second";
+	case 1:
+		return plural ? "minutes" : "minute";
+	case 2:
+		return plural ? "hours" : "hour";
+	default:
+		return "?";
+	}
+}
+
 string FormatRelative(timestamp_t target, timestamp_t reference) {
-	int64_t target_us = Timestamp::GetEpochMicroSeconds(target);
-	int64_t ref_us = Timestamp::GetEpochMicroSeconds(reference);
-	int64_t delta_us = ref_us - target_us;
-	int64_t delta_sec = delta_us / Interval::MICROS_PER_SEC;
+	const int64_t target_us = Timestamp::GetEpochMicroSeconds(target);
+	const int64_t ref_us = Timestamp::GetEpochMicroSeconds(reference);
+	const int64_t delta_signed = ref_us - target_us;
+	const int64_t abs_us = std::abs(delta_signed);
 
-	if (delta_sec <= Interval::SECS_PER_MINUTE) {
-		return std::to_string(delta_sec) + " seconds ago";
+	if (abs_us < Interval::MICROS_PER_SEC) {
+		return "just now";
 	}
 
-	int64_t delta_min = delta_sec / Interval::SECS_PER_MINUTE;
-	if (delta_min <= Interval::MINS_PER_HOUR) {
-		return std::to_string(delta_min) + " minutes ago";
+	const bool is_past = delta_signed > 0;
+	const int64_t abs_sec = abs_us / Interval::MICROS_PER_SEC;
+
+	int unit_idx;
+	int64_t value;
+	if (abs_sec < Interval::SECS_PER_MINUTE) {
+		unit_idx = 0;
+		value = abs_sec;
+	} else if (abs_sec < Interval::SECS_PER_HOUR) {
+		unit_idx = 1;
+		value = abs_sec / Interval::SECS_PER_MINUTE;
+	} else {
+		// NOTE: anything >= 1 hour is reported as hours by this initial
+		// implementation. Days, weeks, months and years are not yet
+		// handled.
+		unit_idx = 2;
+		value = abs_sec / Interval::SECS_PER_HOUR;
 	}
 
-	int64_t delta_hr = delta_min / Interval::MINS_PER_HOUR;
-	return std::to_string(delta_hr) + " hours ago";
+	const bool plural = value != 1;
+	const string body = std::to_string(value) + " " + UnitNameLong(unit_idx, plural);
+	return is_past ? body + " ago" : "in " + body;
 }
 
 void HumanizeRelativeTimeFunction(DataChunk &args, ExpressionState &state, Vector &result) {
@@ -44,40 +79,73 @@ void HumanizeRelativeTimeFunction(DataChunk &args, ExpressionState &state, Vecto
 	    });
 }
 
+// ---------------------------------------------------------------------------
 // Companion to FormatRelative that returns the same decomposition as a
 // STRUCT(value BIGINT, unit VARCHAR, direction VARCHAR). Downstream callers
-// rely on the field names (`value`, `unit`, `direction`) and on `direction`
-// taking string values from a small fixed vocabulary. The unit field uses
-// the canonical singular form of each unit name.
+// rely on the field names (`value`, `unit`, `direction`) and the value
+// vocabularies. The unit field uses the canonical singular form of each
+// unit name, or the sentinel "just_now" for the negligible-delta case.
+// The direction field is one of "past", "future", or "zero".
 //
 // Initial implementation: same coverage as FormatRelative — only the three
-// smallest units, only the past direction (so `direction` is always "past"),
-// and no special-case for negligible deltas. Larger units, future direction,
-// the negligible-delta sentinel, and additional input-type overloads are
+// smallest units. Larger units and additional input-type overloads are
 // not yet implemented.
+// ---------------------------------------------------------------------------
+
+const char *UnitTokenForParts(int unit) {
+	// unit: -1=just_now, 0=second, 1=minute, 2=hour
+	switch (unit) {
+	case -1:
+		return "just_now";
+	case 0:
+		return "second";
+	case 1:
+		return "minute";
+	case 2:
+		return "hour";
+	default:
+		return "?";
+	}
+}
+
+const char *DirectionToken(int direction) {
+	if (direction < 0) {
+		return "past";
+	}
+	if (direction > 0) {
+		return "future";
+	}
+	return "zero";
+}
+
 struct PartsResult {
-	int64_t value;
-	const char *unit;
-	const char *direction;
+	int unit;       // -1=just_now, 0=second, 1=minute, 2=hour
+	int64_t value;  // 0 for just_now, otherwise the magnitude
+	int direction;  // -1=past, +1=future, 0=zero
 };
 
 PartsResult ComputePartsRelative(timestamp_t target, timestamp_t reference) {
-	int64_t target_us = Timestamp::GetEpochMicroSeconds(target);
-	int64_t ref_us = Timestamp::GetEpochMicroSeconds(reference);
-	int64_t delta_us = ref_us - target_us;
-	int64_t delta_sec = delta_us / Interval::MICROS_PER_SEC;
+	const int64_t target_us = Timestamp::GetEpochMicroSeconds(target);
+	const int64_t ref_us = Timestamp::GetEpochMicroSeconds(reference);
+	const int64_t delta_signed = ref_us - target_us;
+	const int64_t abs_us = std::abs(delta_signed);
 
-	if (delta_sec <= Interval::SECS_PER_MINUTE) {
-		return {delta_sec, "second", "past"};
+	if (abs_us < Interval::MICROS_PER_SEC) {
+		return {-1, 0, 0};
 	}
 
-	int64_t delta_min = delta_sec / Interval::SECS_PER_MINUTE;
-	if (delta_min <= Interval::MINS_PER_HOUR) {
-		return {delta_min, "minute", "past"};
-	}
+	const int direction = (delta_signed > 0) ? -1 : 1;
+	const int64_t abs_sec = abs_us / Interval::MICROS_PER_SEC;
 
-	int64_t delta_hr = delta_min / Interval::MINS_PER_HOUR;
-	return {delta_hr, "hour", "past"};
+	if (abs_sec < Interval::SECS_PER_MINUTE) {
+		return {0, abs_sec, direction};
+	}
+	if (abs_sec < Interval::SECS_PER_HOUR) {
+		return {1, abs_sec / Interval::SECS_PER_MINUTE, direction};
+	}
+	// NOTE: anything >= 1 hour is reported as hours by this initial
+	// implementation. Days, weeks, months and years are not yet handled.
+	return {2, abs_sec / Interval::SECS_PER_HOUR, direction};
 }
 
 void HumanizeRelativeTimePartsFunction(DataChunk &args, ExpressionState &state, Vector &result) {
@@ -113,9 +181,9 @@ void HumanizeRelativeTimePartsFunction(DataChunk &args, ExpressionState &state, 
 		const auto parts = ComputePartsRelative(target_ptr[t_idx], ref_ptr[r_idx]);
 		value_data[i] = parts.value;
 		FlatVector::GetDataMutable<string_t>(unit_vec)[i] =
-		    StringVector::AddString(unit_vec, parts.unit);
+		    StringVector::AddString(unit_vec, UnitTokenForParts(parts.unit));
 		FlatVector::GetDataMutable<string_t>(dir_vec)[i] =
-		    StringVector::AddString(dir_vec, parts.direction);
+		    StringVector::AddString(dir_vec, DirectionToken(parts.direction));
 	}
 }
 
