@@ -150,6 +150,14 @@
         "type": "scalar_function"
     },
     {
+        "struct": "HumanizeRelativeTimePartsFun",
+        "name": "humanize_relative_time_parts",
+        "parameters": "target,reference",
+        "description": "Decompose the difference between two timestamps into a STRUCT(value BIGINT, unit VARCHAR, direction VARCHAR) using the same magnitude / unit selection that humanize_relative_time uses",
+        "example": "humanize_relative_time_parts(TIMESTAMP '2025-01-01', TIMESTAMP '2025-06-01')",
+        "type": "scalar_function"
+    },
+    {
         "struct": "ISODayOfWeekFun",
         "name": "isodow",
         "parameters": "ts",

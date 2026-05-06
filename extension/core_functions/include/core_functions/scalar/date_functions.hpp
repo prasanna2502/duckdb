@@ -251,6 +251,16 @@ struct HumanizeRelativeTimeFun {
 	static ScalarFunction GetFunction();
 };
 
+struct HumanizeRelativeTimePartsFun {
+	static constexpr const char *Name = "humanize_relative_time_parts";
+	static constexpr const char *Parameters = "target,reference";
+	static constexpr const char *Description = "Decompose the difference between two timestamps into a STRUCT(value BIGINT, unit VARCHAR, direction VARCHAR) using the same magnitude / unit selection that humanize_relative_time uses";
+	static constexpr const char *Example = "humanize_relative_time_parts(TIMESTAMP '2025-01-01', TIMESTAMP '2025-06-01')";
+	static constexpr const char *Categories = "";
+
+	static ScalarFunction GetFunction();
+};
+
 struct ISODayOfWeekFun {
 	static constexpr const char *Name = "isodow";
 	static constexpr const char *Parameters = "ts";
