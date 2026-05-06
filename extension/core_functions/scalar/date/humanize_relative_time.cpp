@@ -15,15 +15,16 @@ namespace {
 // Format the difference between `target` and `reference` as a human-readable
 // English phrase such as "5 minutes ago" or "in 3 hours".
 //
-// Initial implementation: covers the three smallest units (seconds, minutes,
-// hours) only. Phrasing handles past / future / negligible-delta direction
-// and singular / plural forms. Larger units (days, weeks, months, years)
-// and additional input-type overloads (DATE, TIMESTAMP_TZ) have not been
-// tackled yet.
+// Initial implementation: covers the smallest five units (seconds, minutes,
+// hours, days, weeks) using simple wall-clock arithmetic. Phrasing handles
+// past / future / negligible-delta direction and singular / plural forms.
+// Months and years are not yet recognised — anything that spans 7 or more
+// days collapses into the weeks bucket — and the function only accepts the
+// (TIMESTAMP, TIMESTAMP) overload.
 // ---------------------------------------------------------------------------
 
 const char *UnitNameLong(int unit, bool plural) {
-	// unit: 0=second, 1=minute, 2=hour
+	// unit: 0=second, 1=minute, 2=hour, 3=day, 4=week
 	switch (unit) {
 	case 0:
 		return plural ? "seconds" : "second";
@@ -31,6 +32,10 @@ const char *UnitNameLong(int unit, bool plural) {
 		return plural ? "minutes" : "minute";
 	case 2:
 		return plural ? "hours" : "hour";
+	case 3:
+		return plural ? "days" : "day";
+	case 4:
+		return plural ? "weeks" : "week";
 	default:
 		return "?";
 	}
@@ -57,12 +62,22 @@ string FormatRelative(timestamp_t target, timestamp_t reference) {
 	} else if (abs_sec < Interval::SECS_PER_HOUR) {
 		unit_idx = 1;
 		value = abs_sec / Interval::SECS_PER_MINUTE;
-	} else {
-		// NOTE: anything >= 1 hour is reported as hours by this initial
-		// implementation. Days, weeks, months and years are not yet
-		// handled.
+	} else if (abs_sec < Interval::SECS_PER_DAY) {
 		unit_idx = 2;
 		value = abs_sec / Interval::SECS_PER_HOUR;
+	} else {
+		const int64_t abs_days = abs_us / Interval::MICROS_PER_DAY;
+		if (abs_days < Interval::DAYS_PER_WEEK) {
+			unit_idx = 3;
+			value = abs_days;
+		} else {
+			// NOTE: anything spanning 7 or more days collapses into the
+			// weeks bucket by this initial implementation. Months and
+			// years are not yet handled (they require calendar-aware
+			// arithmetic via Interval::GetAge).
+			unit_idx = 4;
+			value = abs_days / Interval::DAYS_PER_WEEK;
+		}
 	}
 
 	const bool plural = value != 1;
@@ -87,13 +102,13 @@ void HumanizeRelativeTimeFunction(DataChunk &args, ExpressionState &state, Vecto
 // unit name, or the sentinel "just_now" for the negligible-delta case.
 // The direction field is one of "past", "future", or "zero".
 //
-// Initial implementation: same coverage as FormatRelative — only the three
-// smallest units. Larger units and additional input-type overloads are
+// Initial implementation: same coverage as FormatRelative — only the five
+// smallest units. Months, years, and additional input-type overloads are
 // not yet implemented.
 // ---------------------------------------------------------------------------
 
 const char *UnitTokenForParts(int unit) {
-	// unit: -1=just_now, 0=second, 1=minute, 2=hour
+	// unit: -1=just_now, 0=second, 1=minute, 2=hour, 3=day, 4=week
 	switch (unit) {
 	case -1:
 		return "just_now";
@@ -103,6 +118,10 @@ const char *UnitTokenForParts(int unit) {
 		return "minute";
 	case 2:
 		return "hour";
+	case 3:
+		return "day";
+	case 4:
+		return "week";
 	default:
 		return "?";
 	}
@@ -119,7 +138,7 @@ const char *DirectionToken(int direction) {
 }
 
 struct PartsResult {
-	int unit;       // -1=just_now, 0=second, 1=minute, 2=hour
+	int unit;       // -1=just_now, 0=second, 1=minute, 2=hour, 3=day, 4=week
 	int64_t value;  // 0 for just_now, otherwise the magnitude
 	int direction;  // -1=past, +1=future, 0=zero
 };
@@ -143,9 +162,16 @@ PartsResult ComputePartsRelative(timestamp_t target, timestamp_t reference) {
 	if (abs_sec < Interval::SECS_PER_HOUR) {
 		return {1, abs_sec / Interval::SECS_PER_MINUTE, direction};
 	}
-	// NOTE: anything >= 1 hour is reported as hours by this initial
-	// implementation. Days, weeks, months and years are not yet handled.
-	return {2, abs_sec / Interval::SECS_PER_HOUR, direction};
+	if (abs_sec < Interval::SECS_PER_DAY) {
+		return {2, abs_sec / Interval::SECS_PER_HOUR, direction};
+	}
+	const int64_t abs_days = abs_us / Interval::MICROS_PER_DAY;
+	if (abs_days < Interval::DAYS_PER_WEEK) {
+		return {3, abs_days, direction};
+	}
+	// NOTE: anything spanning 7 or more days collapses into the weeks bucket
+	// by this initial implementation. Months and years are not yet handled.
+	return {4, abs_days / Interval::DAYS_PER_WEEK, direction};
 }
 
 void HumanizeRelativeTimePartsFunction(DataChunk &args, ExpressionState &state, Vector &result) {
