@@ -241,6 +241,16 @@ struct HoursFun {
 	static ScalarFunctionSet GetFunctions();
 };
 
+struct HumanizeRelativeTimeFun {
+	static constexpr const char *Name = "humanize_relative_time";
+	static constexpr const char *Parameters = "target,reference";
+	static constexpr const char *Description = "Format the difference between two timestamps as a human-readable English phrase such as '5 minutes ago' or 'in 2 hours'";
+	static constexpr const char *Example = "humanize_relative_time(TIMESTAMP '2025-01-01', TIMESTAMP '2025-06-01')";
+	static constexpr const char *Categories = "";
+
+	static ScalarFunction GetFunction();
+};
+
 struct ISODayOfWeekFun {
 	static constexpr const char *Name = "isodow";
 	static constexpr const char *Parameters = "ts";

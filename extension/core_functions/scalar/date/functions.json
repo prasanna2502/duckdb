@@ -142,6 +142,14 @@
         "type": "scalar_function_set"
     },
     {
+        "struct": "HumanizeRelativeTimeFun",
+        "name": "humanize_relative_time",
+        "parameters": "target,reference",
+        "description": "Format the difference between two timestamps as a human-readable English phrase such as '5 minutes ago' or 'in 2 hours'",
+        "example": "humanize_relative_time(TIMESTAMP '2025-01-01', TIMESTAMP '2025-06-01')",
+        "type": "scalar_function"
+    },
+    {
         "struct": "ISODayOfWeekFun",
         "name": "isodow",
         "parameters": "ts",
