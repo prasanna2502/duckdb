@@ -147,7 +147,7 @@
         "parameters": "target,reference",
         "description": "Format the difference between two timestamps as a human-readable English phrase such as '5 minutes ago' or 'in 2 hours'",
         "example": "humanize_relative_time(TIMESTAMP '2025-01-01', TIMESTAMP '2025-06-01')",
-        "type": "scalar_function"
+        "type": "scalar_function_set"
     },
     {
         "struct": "HumanizeRelativeTimePartsFun",
@@ -155,7 +155,7 @@
         "parameters": "target,reference",
         "description": "Decompose the difference between two timestamps into a STRUCT(value BIGINT, unit VARCHAR, direction VARCHAR) using the same magnitude / unit selection that humanize_relative_time uses",
         "example": "humanize_relative_time_parts(TIMESTAMP '2025-01-01', TIMESTAMP '2025-06-01')",
-        "type": "scalar_function"
+        "type": "scalar_function_set"
     },
     {
         "struct": "ISODayOfWeekFun",

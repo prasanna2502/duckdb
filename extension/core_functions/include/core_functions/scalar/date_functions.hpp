@@ -248,7 +248,7 @@ struct HumanizeRelativeTimeFun {
 	static constexpr const char *Example = "humanize_relative_time(TIMESTAMP '2025-01-01', TIMESTAMP '2025-06-01')";
 	static constexpr const char *Categories = "";
 
-	static ScalarFunction GetFunction();
+	static ScalarFunctionSet GetFunctions();
 };
 
 struct HumanizeRelativeTimePartsFun {
@@ -258,7 +258,7 @@ struct HumanizeRelativeTimePartsFun {
 	static constexpr const char *Example = "humanize_relative_time_parts(TIMESTAMP '2025-01-01', TIMESTAMP '2025-06-01')";
 	static constexpr const char *Categories = "";
 
-	static ScalarFunction GetFunction();
+	static ScalarFunctionSet GetFunctions();
 };
 
 struct ISODayOfWeekFun {

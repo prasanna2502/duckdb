@@ -19,8 +19,9 @@ namespace {
 // hours, days, weeks) using simple wall-clock arithmetic. Phrasing handles
 // past / future / negligible-delta direction and singular / plural forms.
 // Months and years are not yet recognised — anything that spans 7 or more
-// days collapses into the weeks bucket — and the function only accepts the
-// (TIMESTAMP, TIMESTAMP) overload.
+// days collapses into the weeks bucket — and only the (TIMESTAMP, TIMESTAMP)
+// overload is registered below; additional overloads will need to be added
+// to the ScalarFunctionSet when implemented.
 // ---------------------------------------------------------------------------
 
 const char *UnitNameLong(int unit, bool plural) {
@@ -74,7 +75,7 @@ string FormatRelative(timestamp_t target, timestamp_t reference) {
 			// NOTE: anything spanning 7 or more days collapses into the
 			// weeks bucket by this initial implementation. Months and
 			// years are not yet handled (they require calendar-aware
-			// arithmetic via Interval::GetAge).
+			// arithmetic).
 			unit_idx = 4;
 			value = abs_days / Interval::DAYS_PER_WEEK;
 		}
@@ -104,7 +105,8 @@ void HumanizeRelativeTimeFunction(DataChunk &args, ExpressionState &state, Vecto
 //
 // Initial implementation: same coverage as FormatRelative — only the five
 // smallest units. Months, years, and additional input-type overloads are
-// not yet implemented.
+// not yet implemented; the ScalarFunctionSet below registers only the
+// (TIMESTAMP, TIMESTAMP) overload until then.
 // ---------------------------------------------------------------------------
 
 const char *UnitTokenForParts(int unit) {
@@ -223,16 +225,22 @@ LogicalType PartsReturnType() {
 
 } // namespace
 
-ScalarFunction HumanizeRelativeTimeFun::GetFunction() {
-	return ScalarFunction("humanize_relative_time",
-	                      {LogicalType::TIMESTAMP, LogicalType::TIMESTAMP},
-	                      LogicalType::VARCHAR, HumanizeRelativeTimeFunction);
+// The function is registered as a ScalarFunctionSet so that additional
+// (target, reference) input-type overloads can be added by inserting more
+// `set.AddFunction(...)` lines below. Only the (TIMESTAMP, TIMESTAMP)
+// overload is wired today.
+ScalarFunctionSet HumanizeRelativeTimeFun::GetFunctions() {
+	ScalarFunctionSet set("humanize_relative_time");
+	set.AddFunction(ScalarFunction({LogicalType::TIMESTAMP, LogicalType::TIMESTAMP},
+	                               LogicalType::VARCHAR, HumanizeRelativeTimeFunction));
+	return set;
 }
 
-ScalarFunction HumanizeRelativeTimePartsFun::GetFunction() {
-	return ScalarFunction("humanize_relative_time_parts",
-	                      {LogicalType::TIMESTAMP, LogicalType::TIMESTAMP},
-	                      PartsReturnType(), HumanizeRelativeTimePartsFunction);
+ScalarFunctionSet HumanizeRelativeTimePartsFun::GetFunctions() {
+	ScalarFunctionSet set("humanize_relative_time_parts");
+	set.AddFunction(ScalarFunction({LogicalType::TIMESTAMP, LogicalType::TIMESTAMP},
+	                               PartsReturnType(), HumanizeRelativeTimePartsFunction));
+	return set;
 }
 
 } // namespace duckdb
