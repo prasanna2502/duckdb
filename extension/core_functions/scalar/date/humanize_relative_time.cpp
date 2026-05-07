@@ -19,9 +19,9 @@ namespace {
 // hours, days, weeks) using simple wall-clock arithmetic. Phrasing handles
 // past / future / negligible-delta direction and singular / plural forms.
 // Months and years are not yet recognised — anything that spans 7 or more
-// days collapses into the weeks bucket — and only the (TIMESTAMP, TIMESTAMP)
-// overload is registered below; additional overloads will need to be added
-// to the ScalarFunctionSet when implemented.
+// days collapses into the weeks bucket. The (TIMESTAMP, TIMESTAMP) and
+// (TIMESTAMP_TZ, TIMESTAMP_TZ) overloads are wired below; the DATE
+// overload still needs to be added when implemented.
 // ---------------------------------------------------------------------------
 
 const char *UnitNameLong(int unit, bool plural) {
@@ -104,9 +104,9 @@ void HumanizeRelativeTimeFunction(DataChunk &args, ExpressionState &state, Vecto
 // The direction field is one of "past", "future", or "zero".
 //
 // Initial implementation: same coverage as FormatRelative — only the five
-// smallest units. Months, years, and additional input-type overloads are
-// not yet implemented; the ScalarFunctionSet below registers only the
-// (TIMESTAMP, TIMESTAMP) overload until then.
+// smallest units. Months, years, and the DATE overload are not yet
+// implemented; the ScalarFunctionSet below registers the (TIMESTAMP,
+// TIMESTAMP) and (TIMESTAMP_TZ, TIMESTAMP_TZ) overloads so far.
 // ---------------------------------------------------------------------------
 
 const char *UnitTokenForParts(int unit) {
@@ -227,11 +227,14 @@ LogicalType PartsReturnType() {
 
 // The function is registered as a ScalarFunctionSet so that additional
 // (target, reference) input-type overloads can be added by inserting more
-// `set.AddFunction(...)` lines below. Only the (TIMESTAMP, TIMESTAMP)
-// overload is wired today.
+// `set.AddFunction(...)` lines below. The (TIMESTAMP, TIMESTAMP) and
+// (TIMESTAMP_TZ, TIMESTAMP_TZ) overloads are wired today; the DATE
+// overload still needs to be added.
 ScalarFunctionSet HumanizeRelativeTimeFun::GetFunctions() {
 	ScalarFunctionSet set("humanize_relative_time");
 	set.AddFunction(ScalarFunction({LogicalType::TIMESTAMP, LogicalType::TIMESTAMP},
+	                               LogicalType::VARCHAR, HumanizeRelativeTimeFunction));
+	set.AddFunction(ScalarFunction({LogicalType::TIMESTAMP_TZ, LogicalType::TIMESTAMP_TZ},
 	                               LogicalType::VARCHAR, HumanizeRelativeTimeFunction));
 	return set;
 }
@@ -239,6 +242,8 @@ ScalarFunctionSet HumanizeRelativeTimeFun::GetFunctions() {
 ScalarFunctionSet HumanizeRelativeTimePartsFun::GetFunctions() {
 	ScalarFunctionSet set("humanize_relative_time_parts");
 	set.AddFunction(ScalarFunction({LogicalType::TIMESTAMP, LogicalType::TIMESTAMP},
+	                               PartsReturnType(), HumanizeRelativeTimePartsFunction));
+	set.AddFunction(ScalarFunction({LogicalType::TIMESTAMP_TZ, LogicalType::TIMESTAMP_TZ},
 	                               PartsReturnType(), HumanizeRelativeTimePartsFunction));
 	return set;
 }
