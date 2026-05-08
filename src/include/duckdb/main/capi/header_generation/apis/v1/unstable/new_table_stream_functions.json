@@ -1,0 +1,16 @@
+{
+  "version": "unstable_new_table_stream_functions",
+  "description": "Streaming row I/O for a table via raw bytes (currently CSV).",
+  "entries": [
+    "duckdb_open_table_stream_writer",
+    "duckdb_table_stream_writer_push_data",
+    "duckdb_table_stream_writer_close",
+    "duckdb_table_stream_writer_destroy",
+    "duckdb_table_stream_writer_error_data",
+    "duckdb_open_table_stream_reader",
+    "duckdb_table_stream_reader_pull_data",
+    "duckdb_table_stream_reader_close",
+    "duckdb_table_stream_reader_destroy",
+    "duckdb_table_stream_reader_error_data"
+  ]
+}

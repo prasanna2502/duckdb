@@ -527,6 +527,12 @@
         "id": 209,
         "name": "is_format_auto_detected",
         "type": "bool"
+      },
+      {
+        "id": 210,
+        "name": "is_stream",
+        "type": "bool",
+        "default": "false"
       }
     ]
   },

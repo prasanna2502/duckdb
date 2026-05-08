@@ -76,6 +76,12 @@ struct AppenderWrapper {
 	ErrorData error_data;
 };
 
+// Forward declarations for table-stream wrappers. The full definitions live in
+// src/main/capi/table_stream-c.cpp because they depend on standard-library
+// thread/atomic primitives that we don't want to leak into this header.
+struct TableStreamWriterWrapper;
+struct TableStreamReaderWrapper;
+
 struct TableDescriptionWrapper {
 	unique_ptr<TableDescription> description;
 	string error;

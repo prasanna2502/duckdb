@@ -74,6 +74,12 @@ ORIGINAL_FUNCTION_GROUP_ORDER = [
     'profiling_info',
     'appender',
     'table_description',
+    # New group: streaming raw-byte I/O for a table via the C API. Inserted right
+    # after table_description because the surface area is conceptually adjacent
+    # (both wrap a (catalog, schema, table) tuple). The header file's section
+    # ordering follows this list, so changes here will reorder the generated
+    # duckdb.h.
+    'table_stream',
     'arrow_interface',
     'threading_information',
     'streaming_result_interface',

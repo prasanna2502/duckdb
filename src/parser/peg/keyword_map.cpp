@@ -361,6 +361,7 @@ void PEGKeywordHelper::InitializeKeywordMaps() { // Renamed for clarity
 	unreserved_keyword_map.insert("stdout");
 	unreserved_keyword_map.insert("storage");
 	unreserved_keyword_map.insert("stored");
+	unreserved_keyword_map.insert("stream");
 	unreserved_keyword_map.insert("strict");
 	unreserved_keyword_map.insert("strip");
 	unreserved_keyword_map.insert("subscription");

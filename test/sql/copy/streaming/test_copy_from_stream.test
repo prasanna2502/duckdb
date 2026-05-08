@@ -1,0 +1,28 @@
+# name: test/sql/copy/streaming/test_copy_from_stream.test
+# description: COPY ... FROM STREAM accepts the new SQL keyword (mirror of TO STREAM)
+# group: [streaming]
+
+statement ok
+CREATE TABLE t(i INTEGER, s VARCHAR);
+
+# Parser + binder accept the STREAM keyword for the FROM direction.
+# In the test runner stdin is not a valid file source, so the runtime
+# fails opening /dev/stdin. The error type confirms the parser + binder
+# accepted the syntax and routed correctly. Real-stdin ingestion is
+# covered by external integration tests (cli pipe, C++ API).
+statement error
+COPY t FROM STREAM (FORMAT csv, HEADER true);
+----
+IO Error
+
+# Explicit column list — same routing.
+statement error
+COPY t(i, s) FROM STREAM (FORMAT csv);
+----
+IO Error
+
+# Per-format options (delimiter override) — also routed.
+statement error
+COPY t FROM STREAM (FORMAT csv, HEADER false, DELIMITER '|');
+----
+IO Error

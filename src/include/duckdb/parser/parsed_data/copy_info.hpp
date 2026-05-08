@@ -36,6 +36,9 @@ public:
 	vector<string> select_list;
 	//! Whether or not this is a copy to file (false) or copy from a file (true)
 	bool is_from;
+	//! Whether the COPY target is the new STREAM keyword (true) instead of a file path (false).
+	//! When true, the binder/CSV adapter substitutes a StreamFileHandle (FD 0/1) for the file path.
+	bool is_stream = false;
 	//! The file format of the external file
 	string format;
 	//! If the format is manually set (i.e., via the format parameter) or was discovered by inspecting the file path

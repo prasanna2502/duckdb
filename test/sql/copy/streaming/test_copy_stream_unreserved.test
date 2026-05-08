@@ -1,0 +1,30 @@
+# name: test/sql/copy/streaming/test_copy_stream_unreserved.test
+# description: STREAM remains an unreserved keyword, usable as a column / table name
+# group: [streaming]
+
+# STREAM is unreserved — bare identifier in a CREATE TABLE column.
+statement ok
+CREATE TABLE has_stream_column(stream INTEGER, payload VARCHAR);
+
+statement ok
+INSERT INTO has_stream_column VALUES (1, 'a'), (2, 'b');
+
+# And in a SELECT.
+query II
+SELECT stream, payload FROM has_stream_column ORDER BY stream;
+----
+1	a
+2	b
+
+# And as a quoted table name.
+statement ok
+CREATE TABLE "stream"(x INTEGER);
+
+statement ok
+INSERT INTO "stream" VALUES (10), (20);
+
+query I
+SELECT x FROM "stream" ORDER BY x;
+----
+10
+20

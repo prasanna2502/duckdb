@@ -1,0 +1,179 @@
+{
+  "group": "table_stream",
+  "deprecated": false,
+  "description": "Streaming row I/O for a table via raw bytes (currently CSV). The writer accepts caller-supplied bytes and ingests them into a target table; the reader pulls bytes that DuckDB has produced from a target table into a caller-supplied buffer. Both are thin wrappers around the SQL `COPY ... FROM/TO STREAM` path: each handle owns a pipe and a worker thread that drives the SQL COPY underneath.",
+  "entries": [
+    {
+      "name": "duckdb_open_table_stream_writer",
+      "return_type": "duckdb_state",
+      "params": [
+        { "type": "duckdb_connection", "name": "connection" },
+        { "type": "const char *", "name": "catalog" },
+        { "type": "const char *", "name": "schema" },
+        { "type": "const char *", "name": "table" },
+        { "type": "const char *", "name": "format" },
+        { "type": "duckdb_table_stream_writer *", "name": "out_writer" }
+      ],
+      "comment": {
+        "description": "Open a streaming writer that pushes raw bytes into a table.\n\nThe writer behaves like a one-shot append: bytes you push with `duckdb_table_stream_writer_push_data` are ingested by a background `COPY tbl FROM STREAM` invocation. The writer must be finalized by calling `duckdb_table_stream_writer_close` (which signals end-of-stream and waits for the COPY to finish) followed by `duckdb_table_stream_writer_destroy`. Even if this function returns `DuckDBError`, the caller still must call `duckdb_table_stream_writer_destroy` on the out-parameter to release any allocated resources.\n\n",
+        "param_comments": {
+          "connection": "The connection context to create the writer in.",
+          "catalog": "The catalog (database) name of the table, or `nullptr` for the default catalog.",
+          "schema": "The schema of the table, or `nullptr` for the default schema.",
+          "table": "The table name to ingest into.",
+          "format": "The format of the byte stream. Currently only `\"csv\"` is supported (case-insensitive).",
+          "out_writer": "The resulting writer object."
+        },
+        "return_value": "`DuckDBSuccess` on success or `DuckDBError` on failure."
+      }
+    },
+    {
+      "name": "duckdb_table_stream_writer_push_data",
+      "return_type": "duckdb_state",
+      "params": [
+        { "type": "duckdb_table_stream_writer", "name": "writer" },
+        { "type": "const void *", "name": "data" },
+        { "type": "idx_t", "name": "length" }
+      ],
+      "comment": {
+        "description": "Push raw bytes into the writer's input pipe. The bytes are interpreted by the underlying COPY according to the format chosen at open time. May block if the pipe is full.\n\n",
+        "param_comments": {
+          "writer": "The writer to push data into.",
+          "data": "Pointer to the buffer containing the bytes to push.",
+          "length": "The number of bytes to push."
+        },
+        "return_value": "`DuckDBSuccess` on success or `DuckDBError` on failure (e.g. the writer was already closed or the underlying COPY raised an error). On error, the error data can be retrieved via `duckdb_table_stream_writer_error_data`."
+      }
+    },
+    {
+      "name": "duckdb_table_stream_writer_close",
+      "return_type": "duckdb_state",
+      "params": [
+        { "type": "duckdb_table_stream_writer", "name": "writer" }
+      ],
+      "comment": {
+        "description": "Signal end-of-stream and wait for the underlying COPY to finish. Idempotent — calling it multiple times is a no-op after the first call.\n\n",
+        "param_comments": {
+          "writer": "The writer to close."
+        },
+        "return_value": "`DuckDBSuccess` if the COPY completed without error, `DuckDBError` otherwise."
+      }
+    },
+    {
+      "name": "duckdb_table_stream_writer_destroy",
+      "return_type": "duckdb_state",
+      "params": [
+        { "type": "duckdb_table_stream_writer *", "name": "writer" }
+      ],
+      "comment": {
+        "description": "Destroy the writer. Implicitly calls `duckdb_table_stream_writer_close` first if the writer was not already closed.\n\n",
+        "param_comments": {
+          "writer": "The writer to destroy."
+        },
+        "return_value": "`DuckDBSuccess` if the writer was destroyed cleanly, `DuckDBError` if the implicit close failed."
+      }
+    },
+    {
+      "name": "duckdb_table_stream_writer_error_data",
+      "return_type": "duckdb_error_data",
+      "params": [
+        { "type": "duckdb_table_stream_writer", "name": "writer" }
+      ],
+      "comment": {
+        "description": "Return a `duckdb_error_data` describing the most recent error on the writer, if any. The returned object must be destroyed with `duckdb_destroy_error_data`. If there is no error, the returned object reports a null type and an empty message.\n\n",
+        "param_comments": {
+          "writer": "The writer to query."
+        },
+        "return_value": "A new `duckdb_error_data` object that the caller must destroy."
+      }
+    },
+    {
+      "name": "duckdb_open_table_stream_reader",
+      "return_type": "duckdb_state",
+      "params": [
+        { "type": "duckdb_connection", "name": "connection" },
+        { "type": "const char *", "name": "catalog" },
+        { "type": "const char *", "name": "schema" },
+        { "type": "const char *", "name": "table" },
+        { "type": "const char *", "name": "format" },
+        { "type": "duckdb_table_stream_reader *", "name": "out_reader" }
+      ],
+      "comment": {
+        "description": "Open a streaming reader that pulls raw bytes out of a table.\n\nThe reader behaves like a one-shot scan: each call to `duckdb_table_stream_reader_pull_data` returns the next chunk of bytes produced by a background `COPY tbl TO STREAM` invocation, until end-of-stream is reached. Even if this function returns `DuckDBError`, the caller still must call `duckdb_table_stream_reader_destroy` on the out-parameter to release any allocated resources.\n\n",
+        "param_comments": {
+          "connection": "The connection context to create the reader in.",
+          "catalog": "The catalog (database) name of the table, or `nullptr` for the default catalog.",
+          "schema": "The schema of the table, or `nullptr` for the default schema.",
+          "table": "The table name to read from.",
+          "format": "The format of the byte stream. Currently only `\"csv\"` is supported (case-insensitive).",
+          "out_reader": "The resulting reader object."
+        },
+        "return_value": "`DuckDBSuccess` on success or `DuckDBError` on failure."
+      }
+    },
+    {
+      "name": "duckdb_table_stream_reader_pull_data",
+      "return_type": "duckdb_state",
+      "params": [
+        { "type": "duckdb_table_stream_reader", "name": "reader" },
+        { "type": "void *", "name": "buffer" },
+        { "type": "idx_t", "name": "buffer_length" },
+        { "type": "idx_t *", "name": "out_length" },
+        { "type": "bool *", "name": "out_eof" }
+      ],
+      "comment": {
+        "description": "Pull up to `buffer_length` bytes out of the reader into the caller-supplied buffer. Sets `*out_length` to the number of bytes actually read and `*out_eof` to true when the reader is exhausted (no further bytes will arrive).\n\nA short read does NOT imply end-of-stream — only `*out_eof == true` does.\n\n",
+        "param_comments": {
+          "reader": "The reader to pull bytes from.",
+          "buffer": "The buffer to write the bytes into.",
+          "buffer_length": "The capacity of the buffer in bytes.",
+          "out_length": "Out-parameter set to the number of bytes actually read into the buffer.",
+          "out_eof": "Out-parameter set to true when the reader is exhausted."
+        },
+        "return_value": "`DuckDBSuccess` on success or `DuckDBError` on failure (e.g. the underlying COPY raised an error). On error, the error data can be retrieved via `duckdb_table_stream_reader_error_data`."
+      }
+    },
+    {
+      "name": "duckdb_table_stream_reader_close",
+      "return_type": "duckdb_state",
+      "params": [
+        { "type": "duckdb_table_stream_reader", "name": "reader" }
+      ],
+      "comment": {
+        "description": "Signal that no further data will be read and wait for the underlying COPY to finish. Idempotent.\n\n",
+        "param_comments": {
+          "reader": "The reader to close."
+        },
+        "return_value": "`DuckDBSuccess` if the COPY completed without error, `DuckDBError` otherwise."
+      }
+    },
+    {
+      "name": "duckdb_table_stream_reader_destroy",
+      "return_type": "duckdb_state",
+      "params": [
+        { "type": "duckdb_table_stream_reader *", "name": "reader" }
+      ],
+      "comment": {
+        "description": "Destroy the reader. Implicitly calls `duckdb_table_stream_reader_close` first if the reader was not already closed.\n\n",
+        "param_comments": {
+          "reader": "The reader to destroy."
+        },
+        "return_value": "`DuckDBSuccess` if the reader was destroyed cleanly, `DuckDBError` if the implicit close failed."
+      }
+    },
+    {
+      "name": "duckdb_table_stream_reader_error_data",
+      "return_type": "duckdb_error_data",
+      "params": [
+        { "type": "duckdb_table_stream_reader", "name": "reader" }
+      ],
+      "comment": {
+        "description": "Return a `duckdb_error_data` describing the most recent error on the reader, if any. The returned object must be destroyed with `duckdb_destroy_error_data`. If there is no error, the returned object reports a null type and an empty message.\n\n",
+        "param_comments": {
+          "reader": "The reader to query."
+        },
+        "return_value": "A new `duckdb_error_data` object that the caller must destroy."
+      }
+    }
+  ]
+}

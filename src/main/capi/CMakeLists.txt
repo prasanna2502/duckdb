@@ -28,6 +28,7 @@ add_library_unity(
   stream-c.cpp
   table_description-c.cpp
   table_function-c.cpp
+  table_stream-c.cpp
   threading-c.cpp
   value-c.cpp
   file_system-c.cpp

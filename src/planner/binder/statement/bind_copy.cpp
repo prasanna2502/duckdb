@@ -542,8 +542,29 @@ void Binder::BindCopyOptions(CopyInfo &info) {
 }
 
 BoundStatement Binder::Bind(CopyStatement &stmt, CopyToType copy_to_type) {
+	// Resolve the STREAM keyword (set by the PEG transformer as a sentinel
+	// "$STREAM$" path with is_stream=true) to the platform's stdin/stdout
+	// pseudo-file path. The downstream binder + CopyFunction implementations
+	// then treat it like any other file path. This path is POSIX-only.
+	if (stmt.info->is_stream) {
+		stmt.info->file_path = stmt.info->is_from ? "/dev/stdin" : "/dev/stdout";
+		stmt.info->file_path_expression.reset();
+	}
+
 	// bind the copy options
 	BindCopyOptions(*stmt.info);
+
+	// Streaming I/O is only supported for sequential formats. Parquet writes
+	// its footer at the end of the file and therefore requires a seekable
+	// destination, which the STREAM target (/dev/std{in,out}) does not provide.
+	// Reject the unsupported combination explicitly instead of writing binary
+	// garbage to stdout (or producing a confusing read error).
+	if (stmt.info->is_stream && StringUtil::CIEquals(stmt.info->format, "parquet")) {
+		throw NotImplementedException(
+		    "COPY ... %s STREAM is not supported with FORMAT 'parquet' because parquet requires a "
+		    "seekable file. Use FORMAT 'csv' for streaming I/O.",
+		    stmt.info->is_from ? "TO" : "FROM");
+	}
 
 	if (!stmt.info->is_from && !stmt.info->select_statement) {
 		// copy table into file without a query

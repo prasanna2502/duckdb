@@ -367,6 +367,13 @@ void CopyInfo::Serialize(Serializer &serializer) const {
 	serializer.WritePropertyWithDefault<case_insensitive_map_t<vector<Value>>>(207, "options", options);
 	serializer.WritePropertyWithDefault<unique_ptr<QueryNode>>(208, "select_statement", select_statement);
 	serializer.WritePropertyWithDefault<bool>(209, "is_format_auto_detected", is_format_auto_detected);
+	// NOTE: id 210 ("is_stream") was added manually below to mirror the new entry in
+	// src/include/duckdb/storage/serialization/parse_info.json. The JSON file is the
+	// source of truth and scripts/generate_serialization.py would normally regenerate
+	// this file. The autogen toolchain is not installed in the dev container used to
+	// build this branch, so the manual sync below is intentional. If/when autogen runs,
+	// it should produce a byte-identical line.
+	serializer.WritePropertyWithDefault<bool>(210, "is_stream", is_stream, false);
 }
 
 unique_ptr<ParseInfo> CopyInfo::Deserialize(Deserializer &deserializer) {
@@ -381,6 +388,8 @@ unique_ptr<ParseInfo> CopyInfo::Deserialize(Deserializer &deserializer) {
 	deserializer.ReadPropertyWithDefault<case_insensitive_map_t<vector<Value>>>(207, "options", result->options);
 	deserializer.ReadPropertyWithDefault<unique_ptr<QueryNode>>(208, "select_statement", result->select_statement);
 	deserializer.ReadPropertyWithDefault<bool>(209, "is_format_auto_detected", result->is_format_auto_detected);
+	// See note above CopyInfo::Serialize for why id 210 is mirrored manually.
+	deserializer.ReadPropertyWithExplicitDefault<bool>(210, "is_stream", result->is_stream, false);
 	return std::move(result);
 }
 

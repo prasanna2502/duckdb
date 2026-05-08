@@ -83,6 +83,9 @@ unique_ptr<SQLStatement> PEGTransformerFactory::TransformCopySelect(PEGTransform
 	} else {
 		info->file_path_expression = std::move(file_name);
 	}
+	if (info->file_path == "$STREAM$") {
+		info->is_stream = true;
+	}
 	auto &options_opt = list_pr.Child<OptionalParseResult>(3);
 	if (options_opt.HasResult()) {
 		auto options = transformer.Transform<vector<GenericCopyOption>>(options_opt.GetResult());
@@ -162,6 +165,9 @@ unique_ptr<SQLStatement> PEGTransformerFactory::TransformCopyTable(PEGTransforme
 	} else {
 		info->file_path_expression = std::move(file_name);
 	}
+	if (info->file_path == "$STREAM$") {
+		info->is_stream = true;
+	}
 	info->format = ExtractFormat(info->file_path);
 
 	auto &copy_options_pr = list_pr.Child<OptionalParseResult>(4);
@@ -193,6 +199,11 @@ unique_ptr<ParsedExpression> PEGTransformerFactory::TransformCopyFileName(PEGTra
 		file_name = choice_pr.Cast<IdentifierParseResult>().identifier;
 		if (StringUtil::CIEquals(file_name, "stdout")) {
 			file_name = "/dev/stdout";
+		} else if (StringUtil::CIEquals(file_name, "stream")) {
+			// Sentinel: TransformCopyTable / TransformCopySelect detect this
+			// and set CopyInfo::is_stream so the binder can substitute a
+			// StreamFileHandle wrapping FD 0/1.
+			file_name = "$STREAM$";
 		}
 	} else {
 		file_name = transformer.Transform<string>(choice_pr);

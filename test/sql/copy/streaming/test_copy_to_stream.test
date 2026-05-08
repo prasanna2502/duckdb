@@ -1,0 +1,24 @@
+# name: test/sql/copy/streaming/test_copy_to_stream.test
+# description: COPY ... TO STREAM accepts the new SQL keyword and produces a CSV byte stream
+# group: [streaming]
+
+statement ok
+CREATE TABLE t(i INTEGER, s VARCHAR);
+
+statement ok
+INSERT INTO t VALUES (1, 'foo'), (2, 'bar'), (3, 'baz');
+
+# Parser + binder accept the STREAM keyword for the TO direction.
+# (The actual CSV bytes are written to stdout; the unittest runner does
+# not capture them as part of the test assertion. This test validates
+# the SQL surface only.)
+statement ok
+COPY t TO STREAM (FORMAT csv, HEADER true);
+
+# STREAM with explicit column subset.
+statement ok
+COPY t(i) TO STREAM (FORMAT csv);
+
+# COPY (SELECT ...) TO STREAM — query-driven write.
+statement ok
+COPY (SELECT i*10 AS i_scaled FROM t ORDER BY i) TO STREAM (FORMAT csv, HEADER true);

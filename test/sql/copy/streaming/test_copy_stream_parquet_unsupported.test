@@ -1,0 +1,33 @@
+# name: test/sql/copy/streaming/test_copy_stream_parquet_unsupported.test
+# description: COPY ... TO/FROM STREAM with FORMAT parquet is rejected with a clear error
+# group: [streaming]
+
+statement ok
+CREATE TABLE t(i INTEGER, s VARCHAR);
+
+statement ok
+INSERT INTO t VALUES (1, 'foo'), (2, 'bar');
+
+# Writing parquet to a stream is not supported (parquet's footer requires
+# a seekable destination, which a pipe / FD-stream cannot provide).
+statement error
+COPY t TO STREAM (FORMAT parquet);
+----
+Not implemented
+
+# Reading parquet from a stream is unsupported for the same reason
+# (parquet readers seek to the file footer first to learn the schema).
+statement error
+COPY t FROM STREAM (FORMAT parquet);
+----
+Not implemented
+
+# Case-insensitivity: 'PARQUET' (upper) is rejected the same way.
+statement error
+COPY t TO STREAM (FORMAT 'PARQUET');
+----
+Not implemented
+
+# CSV remains supported (sanity check that the guard is format-specific).
+statement ok
+COPY t TO STREAM (FORMAT csv, HEADER true);

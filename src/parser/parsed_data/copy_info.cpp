@@ -16,6 +16,7 @@ unique_ptr<CopyInfo> CopyInfo::Copy() const {
 	result->file_path_expression = file_path_expression ? file_path_expression->Copy() : nullptr;
 	result->file_path = file_path;
 	result->is_from = is_from;
+	result->is_stream = is_stream;
 	result->format = format;
 	result->is_format_auto_detected = is_format_auto_detected;
 	for (auto &entry : parsed_options) {
